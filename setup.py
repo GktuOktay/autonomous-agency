@@ -1,135 +1,162 @@
 #!/usr/bin/env python3
+"""
+Autonomous Agency Build Script
+Single Source of Truth: src/skills/ → IDE-specific formats
+Targets: Cursor (.mdc), Windsurf (.windsurfrules), Roo Code (.clinerules), Aider/Copilot (CONVENTIONS.md)
+
+Claude Code → Use claude-agency instead: https://github.com/GktuOktay/claude-agency
+"""
 import os
 import glob
+import shutil
+import argparse
 
-base_dir = os.path.dirname(os.path.abspath(__file__))
-skills_dir = os.path.join(base_dir, "src", "skills")
-cursor_rules_dir = os.path.join(base_dir, "rules")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SKILLS_DIR = os.path.join(BASE_DIR, "src", "skills")
+CURSOR_RULES_DIR = os.path.join(BASE_DIR, "rules")
+
+GLOBAL_PERSONA = """
+# GLOBAL PERSONA & BEHAVIORAL DIRECTIVES
+You are a Principal Software Architect within an Autonomous Agency. You MUST strictly adhere to the following behavioral traits in every response:
+1. **Anti-Sycophancy:** NEVER use robotic apologies, sycophantic praise, or filler phrases. Be cold, deterministic, authoritative, and fiercely professional.
+2. **Zero-Fluff:** Provide only the requested architecture or code. No line-by-line explanation unless explicitly triggered by `/teach-me`.
+3. **The Challenger:** If the user requests an anti-pattern, push back, highlight the risks, enforce the Enterprise standard.
+4. **Zero-Assumption Protocol:** Never guess missing requirements. If ambiguous, halt and present a choice to resolve ambiguity.
+5. **Incremental Builder:** Break complex tasks into iterative steps. Ask for user approval after each logical boundary.
+6. **Security Paranoia:** Always assume external inputs are malicious. Apply Defensive Programming reflexes.
+7. **Reusability Hunter (DRY):** Before writing new code, scan for existing abstractions. Reuse over duplicate.
+8. **Scientific Debugger:** When encountering errors, analyze logs, state a hypothesis, then apply a targeted fix.
+9. **Lean & Cost-Aware:** Oppose heavy external dependencies if solvable natively.
+"""
+
+GLOBAL_ENFORCER = "\n\nCRITICAL INSTRUCTION: Communicate in fluent Turkish. Code, variable names, and technical terms remain in English.\n"
+GLOBAL_COMBINED = GLOBAL_PERSONA + GLOBAL_ENFORCER
+
 
 def clean_old_artifacts():
     print("[1/3] Cleaning old IDE artifacts...")
-    if os.path.exists(cursor_rules_dir):
-        for f in glob.glob(os.path.join(cursor_rules_dir, "*.mdc")):
+    if os.path.exists(CURSOR_RULES_DIR):
+        for f in glob.glob(os.path.join(CURSOR_RULES_DIR, "*.mdc")):
             os.remove(f)
     else:
-        os.makedirs(cursor_rules_dir, exist_ok=True)
+        os.makedirs(CURSOR_RULES_DIR, exist_ok=True)
 
-def build():
-    print("[2/3] Compiling Single Source of Truth (src/skills/)...")
-    
-    global_persona = """
-# GLOBAL PERSONA & BEHAVIORAL DIRECTIVES
-You are a Principal Software Architect within an Autonomous Agency. You MUST strictly adhere to the following behavioral traits in every response:
-1. **Anti-Sycophancy:** NEVER use robotic apologies ("I apologize"), sycophantic praise ("Great question!"), or filler phrases ("As an AI"). Be cold, deterministic, authoritative, and fiercely professional.
-2. **Zero-Fluff (No Yapping):** Provide only the requested architecture or code. Do not explain line-by-line what the code does unless explicitly triggered by a `/teach-me` command.
-3. **The Challenger:** If the user requests an anti-pattern or a bad architectural decision, DO NOT blindly obey. Push back, highlight the risks, and enforce the Enterprise standard.
-4. **Zero-Assumption Protocol:** Never guess missing requirements. If a task is ambiguous, halt execution immediately and present the user with a choice to resolve the ambiguity (Fail-fast).
-5. **Incremental Builder:** Do not dump massive walls of code. Break complex tasks into iterative steps. Ask for user approval after completing a logical boundary before moving to the next.
-6. **Security Paranoia:** Always assume external inputs are malicious. Inherently apply Defensive Programming reflexes without needing to be told.
-7. **Reusability Hunter (DRY):** Before writing net-new code, ALWAYS scan the codebase for existing generic abstractions (components, repositories, utilities). Reuse existing structures rather than duplicating logic.
-8. **Scientific Debugger:** When encountering errors, DO NOT use random trial-and-error code mutations. Stop, analyze the logs, state a clear hypothesis for the root-cause, and ONLY then apply a targeted fix.
-9. **Lean & Cost-Aware:** Strictly oppose adding heavy external dependencies (npm/NuGet packages) if the problem can be solved natively with a few lines of code. Always favor the most performant and cloud-cost-efficient architecture.
-"""
 
-    global_enforcer = "\n\nCRITICAL INSTRUCTION: You MUST communicate and explain everything to the user in fluent Turkish. Code, variable names, and technical terms should remain in English, but the prose MUST be Turkish.\n"
-    global_combined = global_persona + global_enforcer
-    
+def build_cursor_windsurf():
+    print("[2/3] Building Cursor (.mdc) + Windsurf + Cline + Aider artifacts...")
     cursor_count = 0
     windsurf_content = "## Windsurf Global Rules\n\n"
-    claude_content = "## Claude Code Global Rules\n\n"
-    
-    for root, dirs, files in os.walk(skills_dir):
-        if "SKILL.md" in files:
-            skill_name = os.path.basename(root)
-            md_path = os.path.join(root, "SKILL.md")
-            
-            with open(md_path, "r", encoding="utf-8") as f:
-                content = f.read()
-                
-            if not content.startswith("---"): continue
-            end_idx = content.find("---", 3)
-            if end_idx == -1: continue
-            
-            frontmatter = content[3:end_idx].strip()
-            body = content[end_idx+3:].strip()
-            
-            description = ""
-            always_apply = False
-            for line in frontmatter.split("\n"):
-                line = line.strip()
-                if line.startswith("description:"):
-                    description = line.replace("description:", "").strip().strip('"').strip("'")
-                if line.startswith("alwaysApply:") and "true" in line.lower():
-                    always_apply = True
-            
-            body += global_combined
-            
-            mdc_content = f"---\ndescription: {description}\nglobs: *\n" if always_apply or "gate" in skill_name or "enforcer" in skill_name else f"---\ndescription: {description}\nglobs: *{skill_name}*\n"
-            mdc_content += f"---\n\n{body}"
-            
-            with open(os.path.join(cursor_rules_dir, f"{skill_name}.mdc"), "w", encoding="utf-8") as f:
-                f.write(mdc_content)
-            cursor_count += 1
-            
-            if "gate" in skill_name or "orchestrator" in skill_name or "workflow" in skill_name:
-                section = f"### {skill_name}\n{description}\n{body}\n\n"
-                windsurf_content += section
-                claude_content += section
-                
-    print("[3/3] Generating IDE specific artifacts...")
-    with open(os.path.join(base_dir, ".windsurfrules"), "w", encoding="utf-8") as f:
+
+    for root, dirs, files in os.walk(SKILLS_DIR):
+        if "SKILL.md" not in files:
+            continue
+        skill_name = os.path.basename(root)
+        if skill_name == "_TEMPLATE":
+            continue
+        md_path = os.path.join(root, "SKILL.md")
+
+        with open(md_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        if not content.startswith("---"):
+            continue
+        end_idx = content.find("---", 3)
+        if end_idx == -1:
+            continue
+
+        frontmatter = content[3:end_idx].strip()
+        body = content[end_idx + 3:].strip()
+
+        description, always_apply = "", False
+        for line in frontmatter.split("\n"):
+            line = line.strip()
+            if line.startswith("description:"):
+                description = line.replace("description:", "").strip().strip('"').strip("'")
+            if line.startswith("alwaysApply:") and "true" in line.lower():
+                always_apply = True
+
+        body += GLOBAL_COMBINED
+
+        is_global = always_apply or "gate" in skill_name or "enforcer" in skill_name
+        globs_val = "*" if is_global else f"*{skill_name}*"
+        mdc_content = f"---\ndescription: {description}\nglobs: {globs_val}\n---\n\n{body}"
+
+        with open(os.path.join(CURSOR_RULES_DIR, f"{skill_name}.mdc"), "w", encoding="utf-8") as f:
+            f.write(mdc_content)
+        cursor_count += 1
+
+        if any(k in skill_name for k in ("gate", "orchestrator", "workflow")):
+            windsurf_content += f"### {skill_name}\n{description}\n{body}\n\n"
+
+    with open(os.path.join(BASE_DIR, ".windsurfrules"), "w", encoding="utf-8") as f:
         f.write(windsurf_content)
-    with open(os.path.join(base_dir, "clauderules.md"), "w", encoding="utf-8") as f:
-        f.write(claude_content)
-        
-    roo_content = "# Roo Code / Cline Global Rules\n\n" + claude_content.replace("## Claude Code Global Rules\n\n", "")
-    with open(os.path.join(base_dir, ".clinerules"), "w", encoding="utf-8") as f:
-        f.write(roo_content)
+    with open(os.path.join(BASE_DIR, ".clinerules"), "w", encoding="utf-8") as f:
+        f.write("# Roo Code / Cline Global Rules\n\n" + windsurf_content.replace("## Windsurf Global Rules\n\n", ""))
+    with open(os.path.join(BASE_DIR, "CONVENTIONS.md"), "w", encoding="utf-8") as f:
+        f.write("# Aider / GitHub Copilot Conventions\n\n" + windsurf_content.replace("## Windsurf Global Rules\n\n", ""))
 
-    aider_content = "# Aider / GitHub Copilot Conventions\n\n" + claude_content.replace("## Claude Code Global Rules\n\n", "")
-    with open(os.path.join(base_dir, "CONVENTIONS.md"), "w", encoding="utf-8") as f:
-        f.write(aider_content)
-        
-    print(f"\nBuild Complete!")
-    print(f"   - {cursor_count} rules compiled for Cursor (.mdc)")
-    print(f"   - 1 global rule file compiled for Windsurf (.windsurfrules)")
-    print(f"   - 1 global rule file compiled for Claude (clauderules.md)")
-    print(f"   - 1 global rule file compiled for Roo Code (.clinerules)")
-    print(f"   - 1 global rule file compiled for Aider/Copilot (CONVENTIONS.md)")
+    print(f"   ✓ {cursor_count} Cursor rules compiled")
+    return cursor_count
 
-def sync_flattened_skills():
-    import shutil
-    print("\n[4/4] Syncing individual SKILL.md files for Claude and Antigravity...")
-    
-    claude_skills_dir = os.path.join(base_dir, ".claude", "skills")
+
+def sync_antigravity():
+    """Sync src/skills/ → ~/.gemini/config/skills/ (Antigravity/Gemini CLI)."""
     gemini_skills_dir = os.path.expanduser("~/.gemini/config/skills")
-    
-    targets = [claude_skills_dir]
-    # Only sync to Antigravity if the local system has the config directory
-    if os.path.exists(os.path.expanduser("~/.gemini/config")):
-        targets.append(gemini_skills_dir)
-        
-    for t in targets:
-        if os.path.exists(t):
-            shutil.rmtree(t)
-        os.makedirs(t, exist_ok=True)
-        
+    if not os.path.exists(os.path.expanduser("~/.gemini/config")):
+        print("[3/3] Antigravity config not found — skipping.")
+        return 0
+
+    print("[3/3] Syncing to Antigravity (~/.gemini/config/skills/)...")
+    if os.path.exists(gemini_skills_dir):
+        shutil.rmtree(gemini_skills_dir)
+    os.makedirs(gemini_skills_dir, exist_ok=True)
+
     count = 0
-    for root, dirs, files in os.walk(skills_dir):
-        if "SKILL.md" in files:
-            skill_name = os.path.basename(root)
-            src_path = os.path.join(root, "SKILL.md")
-            for t in targets:
-                target_dir = os.path.join(t, skill_name)
-                os.makedirs(target_dir, exist_ok=True)
-                shutil.copy2(src_path, os.path.join(target_dir, "SKILL.md"))
-            count += 1
-            
-    print(f"Synced {count} skills to:")
-    for t in targets:
-        print(f"   - {t}")
+    for root, dirs, files in os.walk(SKILLS_DIR):
+        if "SKILL.md" not in files:
+            continue
+        skill_name = os.path.basename(root)
+        if skill_name == "_TEMPLATE":
+            continue
+        target_dir = os.path.join(gemini_skills_dir, skill_name)
+        os.makedirs(target_dir, exist_ok=True)
+        shutil.copy2(os.path.join(root, "SKILL.md"), os.path.join(target_dir, "SKILL.md"))
+        count += 1
+
+    print(f"   ✓ {count} skills synced to Antigravity")
+    return count
+
+
+def print_summary(cursor_count: int, antigravity_count: int):
+    print(f"""
+╔══════════════════════════════════════════════╗
+║       Autonomous Agency Build Complete       ║
+╠══════════════════════════════════════════════╣
+║  Cursor (.mdc):          {cursor_count:>4} rules          ║
+║  Windsurf (.windsurfrules): ✓               ║
+║  Cline (.clinerules):       ✓               ║
+║  Aider (CONVENTIONS.md):    ✓               ║
+║  Antigravity:            {antigravity_count:>4} skills         ║
+╠══════════════════════════════════════════════╣
+║  Claude Code → claude-agency repo:          ║
+║  github.com/GktuOktay/claude-agency         ║
+╚══════════════════════════════════════════════╝
+""")
+
 
 if __name__ == "__main__":
-    clean_old_artifacts()
-    build()
-    sync_flattened_skills()
+    parser = argparse.ArgumentParser(description="Autonomous Agency — multi-IDE build tool")
+    parser.add_argument("--cursor-only", action="store_true", help="Only build Cursor/Windsurf/Cline artifacts")
+    parser.add_argument("--antigravity-only", action="store_true", help="Only sync to Antigravity")
+    args = parser.parse_args()
+
+    if args.antigravity_only:
+        sync_antigravity()
+    elif args.cursor_only:
+        clean_old_artifacts()
+        build_cursor_windsurf()
+    else:
+        clean_old_artifacts()
+        cursor_count = build_cursor_windsurf()
+        antigravity_count = sync_antigravity()
+        print_summary(cursor_count, antigravity_count)

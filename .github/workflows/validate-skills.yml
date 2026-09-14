@@ -1,0 +1,172 @@
+name: Validate Skills
+
+on:
+  push:
+    paths:
+      - 'src/skills/**'
+      - 'setup.py'
+      - '.claude/skills/**'
+  pull_request:
+    paths:
+      - 'src/skills/**'
+      - 'setup.py'
+      - '.claude/skills/**'
+
+jobs:
+  validate:
+    name: Skill Validation (Full)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 1 — Frontmatter validation
+        run: |
+          python3 - <<'EOF'
+          import glob, sys, re
+
+          REQUIRED_FIELDS = ["name", "description"]
+          errors = []
+
+          for filepath in sorted(glob.glob("src/skills/**/SKILL.md", recursive=True)):
+              with open(filepath, encoding="utf-8") as f:
+                  content = f.read()
+
+              if not content.startswith("---"):
+                  errors.append(f"[MISSING FRONTMATTER] {filepath}")
+                  continue
+
+              end = content.find("---", 3)
+              if end == -1:
+                  errors.append(f"[UNCLOSED FRONTMATTER] {filepath}")
+                  continue
+
+              frontmatter = content[3:end]
+              for field in REQUIRED_FIELDS:
+                  if not re.search(rf"^{field}\s*:", frontmatter, re.MULTILINE):
+                      errors.append(f"[MISSING FIELD '{field}'] {filepath}")
+
+              # description must not be empty
+              desc_match = re.search(r'^description\s*:\s*(.+)', frontmatter, re.MULTILINE)
+              if desc_match and desc_match.group(1).strip() in ('""', "''", ""):
+                  errors.append(f"[EMPTY DESCRIPTION] {filepath}")
+
+          if errors:
+              print(f"\n❌ {len(errors)} frontmatter error(s) found:\n")
+              for e in errors:
+                  print(f"  {e}")
+              sys.exit(1)
+
+          skill_count = len(glob.glob("src/skills/**/SKILL.md", recursive=True))
+          print(f"✓ All {skill_count} skills passed frontmatter validation")
+          EOF
+
+      - name: 2 — Naming convention check
+        run: |
+          python3 - <<'EOF'
+          import glob, sys, re, os
+
+          errors = []
+          VALID_NAME = re.compile(r'^[a-z0-9]+(-[a-z0-9]+)*$')
+
+          for filepath in sorted(glob.glob("src/skills/**/SKILL.md", recursive=True)):
+              skill_dir = os.path.basename(os.path.dirname(filepath))
+
+              # Directory name convention: kebab-case
+              if not VALID_NAME.match(skill_dir):
+                  errors.append(f"[NAMING] '{skill_dir}' — must be kebab-case (e.g. audit-trail-guardian-gate)")
+
+              # name field must match directory name
+              with open(filepath, encoding="utf-8") as f:
+                  content = f.read()
+              end = content.find("---", 3)
+              if end == -1:
+                  continue
+              frontmatter = content[3:end]
+              name_match = re.search(r'^name\s*:\s*(.+)', frontmatter, re.MULTILINE)
+              if name_match:
+                  declared_name = name_match.group(1).strip().strip('"\'')
+                  if declared_name != skill_dir:
+                      errors.append(f"[NAME MISMATCH] {filepath}: name='{declared_name}' but dir='{skill_dir}'")
+
+          if errors:
+              print(f"\n❌ {len(errors)} naming error(s):\n")
+              for e in errors:
+                  print(f"  {e}")
+              sys.exit(1)
+
+          print(f"✓ All skill names follow kebab-case convention and match directory names")
+          EOF
+
+      - name: 3 — Duplicate skill name detection
+        run: |
+          python3 - <<'EOF'
+          import glob, sys, re, os
+          from collections import defaultdict
+
+          names = defaultdict(list)
+
+          for filepath in glob.glob("src/skills/**/SKILL.md", recursive=True):
+              with open(filepath, encoding="utf-8") as f:
+                  content = f.read()
+              end = content.find("---", 3)
+              if end == -1:
+                  continue
+              frontmatter = content[3:end]
+              name_match = re.search(r'^name\s*:\s*(.+)', frontmatter, re.MULTILINE)
+              if name_match:
+                  name = name_match.group(1).strip().strip('"\'')
+                  names[name].append(filepath)
+
+          duplicates = {k: v for k, v in names.items() if len(v) > 1}
+          if duplicates:
+              print(f"\n❌ {len(duplicates)} duplicate skill name(s):\n")
+              for name, paths in duplicates.items():
+                  print(f"  '{name}':")
+                  for p in paths:
+                      print(f"    - {p}")
+              sys.exit(1)
+
+          print(f"✓ No duplicate skill names found ({len(names)} unique skills)")
+          EOF
+
+      - name: 4 — Build test (setup.py --skills-only)
+        run: python3 setup.py --skills-only
+
+      - name: 5 — Verify .claude/skills/ sync
+        run: |
+          python3 - <<'EOF'
+          import glob, sys, os
+
+          src_skills = set(
+              os.path.basename(os.path.dirname(p))
+              for p in glob.glob("src/skills/**/SKILL.md", recursive=True)
+          )
+          claude_skills = set(
+              os.path.basename(os.path.dirname(p))
+              for p in glob.glob(".claude/skills/*/SKILL.md")
+          )
+
+          missing = src_skills - claude_skills
+          if missing:
+              print(f"\n❌ {len(missing)} skill(s) missing from .claude/skills/ after build:\n")
+              for s in sorted(missing):
+                  print(f"  - {s}")
+              sys.exit(1)
+
+          print(f"✓ .claude/skills/ in sync: {len(claude_skills)} skills")
+          EOF
+
+      - name: Summary
+        if: success()
+        run: |
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  ✅ All skill validation checks passed"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

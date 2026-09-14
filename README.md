@@ -1,64 +1,98 @@
-# Autonomous Agency (v2.0)
+# Autonomous Agency
 
-[🇹🇷 Türkçe Dokümantasyon (Turkish)](README.tr.md)
+[🇹🇷 Türkçe](README.tr.md)
 
-![Architecture](https://img.shields.io/badge/Architecture-Multi--Agent_Ecosystem-blue)
-![Quality Gates](https://img.shields.io/badge/Quality_Gates-Strict_Enforcement-red)
-![Total Agents](https://img.shields.io/badge/Active_Specialists-109-success)
+Multi-IDE enterprise-grade multi-agent skill sistemi.
+Single Source of Truth: `src/skills/` → Cursor, Windsurf, Roo Code, Aider/Copilot, Antigravity.
 
-**Autonomous Agency** is an enterprise-grade, multi-agent AI ecosystem designed to replace standard conversational coding with a deterministic, autonomous software factory. It enforces Test-Driven Development (TDD), Strict Architectural Patterns (e.g., CQRS, .NET Clean Architecture), and automated API handoffs.
-
-## 🚀 Key Differentiators
-* **Not a Prompt Library:** It is a hierarchical company of agents (Orchestrators, Specialists, and Quality Gates).
-* **Strict Quality Gates:** Code is rejected if it lacks unit tests, swagger documentation, or structured logging.
-* **Single Source of Truth (SSOT):** Over 100 skills compiled dynamically for multiple IDEs (Cursor, Claude Code, Windsurf) from a single `src/skills/` directory.
-
-## 📚 Technical Documentation & Whitepapers
-This repository contains deep architectural insights. Below is the index of all core system documents and what they govern:
-
-### 0. Quick Start & Usage
-* 🚀 **[Installation & Usage Guide](docs/en/core/INSTALL_AND_USAGE.md)**
-  * Learn how to build the agents, integrate them into Cursor/Windsurf, and how to properly communicate with the Orchestrators.
-
-### 1. System Constitution & Constraints
-* ⚖️ **[Hierarchy & Delegation Protocol](docs/en/core/HIERARCHY_PROTOCOL.md)** 
-  * Defines the hard constraints of the ecosystem: Why Orchestrators are prohibited from writing code, why Quality Gates are Read-Only (they cannot fix code, only reject it), and the exact state-machine lifecycle of a user request.
-
-### 2. Architectural Design
-* 🏗️ **[Architecture Deep-Dive](docs/en/core/ARCHITECTURE.md)** 
-  * Explains the 5-layer Anatomy of the agency (01 to 05). Details the "Abstract Syntax Tree" parsing of user requests and the explicit fallback mechanisms when code fails a Quality Gate.
-
-### 3. Engineering Mindset & Behaviors
-* 🎭 **[System Persona & Directives](docs/en/core/PERSONAS.md)**
-  * Defines the behavioral psychology of the agents: Anti-sycophancy, zero-assumption execution, and the willingness to challenge bad architectural decisions.
-
-* 🧠 **[Core Engineering Principles](docs/en/core/PRINCIPLES.md)** 
-  * Documents the "Principal Architect" mindset embedded in the agents. Includes C# code snippets demonstrating Anti-Patterns (e.g., Over-engineered BaseServices) versus Best Practices (CQRS, Defensive Programming, IoC, Database Schema Segregation).
-
-### 4. Process Automation
-* 🔄 **[Autonomous Workflows](docs/en/core/WORKFLOWS.md)** 
-  * Details the automated routines that eliminate boilerplate. Explains the API Handoff Algorithm (how the system generates JSON diffs between Backend and Frontend) and the exact CLI sequence executed during Project Scaffolding.
-
-## 📋 The Agency Departments & Skill Catalog
-The ecosystem consists of **109 strictly defined roles** grouped by professional domains (e.g., `backend_and_data`, `security_and_pentest`). 
-👉 **[View the Complete Catalog of all 109 Agents & Skills](docs/en/catalogs/SKILLS_CATALOG.md)**
-
-### 🗺️ Orchestrator Maps
-Curious about who reports to whom? Explore the specific delegation diagrams (Mermaid) for our core managers:
-* [Master Orchestrator](docs/en/orchestrators/master-orchestrator.md) — The CEO agent.
-* [Code Orchestrator](docs/en/orchestrators/code-orchestrator.md) — Manages Backend, Frontend, and Migrations.
-* [Security Orchestrator](docs/en/orchestrators/security-orchestrator.md) — Manages Pentesters and IDOR/JWT Specialists.
-* [Design Orchestrator](docs/en/orchestrators/design-orchestrator.md) — Manages UX/UI, Brandkit, and Copywriting.
-* [Test Orchestrator](docs/en/orchestrators/test-orchestrator.md) — Manages Unit, Smoke, and E2E Testing.
-* *(See the [Catalog](docs/en/catalogs/SKILLS_CATALOG.md) for BA, Deployment, and Marketing Orchestrators).*
-
-## ⚙️ Installation & Build
-Autonomous Agency uses a centralized SSOT compiler. To inject all 109 rules into your IDEs:
-
-```bash
-python3 setup.py
-```
-This generates the required `.mdc` files for Cursor, `.windsurfrules` for Windsurf, and `clauderules.md` for Claude.
+> **Claude Code kullanıyorsan:** → [claude-agency](https://github.com/GktuOktay/claude-agency)
+> Native subagent, hooks ve MCP entegrasyonu olan Claude Code'a özel repo.
 
 ---
-*Built for Principal Engineers who demand determinism, not just suggestions.*
+
+## Desteklenen IDE'ler
+
+| IDE | Format | Çıktı |
+|---|---|---|
+| Cursor | `.mdc` | `rules/*.mdc` |
+| Windsurf | `.windsurfrules` | `.windsurfrules` |
+| Roo Code / Cline | `.clinerules` | `.clinerules` |
+| Aider / GitHub Copilot | `CONVENTIONS.md` | `CONVENTIONS.md` |
+| Antigravity (Gemini CLI) | flat skills | `~/.gemini/config/skills/` |
+
+---
+
+## Kurulum
+
+```bash
+git clone https://github.com/GktuOktay/autonomous-agency.git
+cd autonomous-agency
+python setup.py
+```
+
+Sadece Cursor/Windsurf için:
+```bash
+python setup.py --cursor-only
+```
+
+Sadece Antigravity için:
+```bash
+python setup.py --antigravity-only
+```
+
+---
+
+## Yapı
+
+```
+autonomous-agency/
+├── src/skills/              # Single Source of Truth — tüm skill'ler buradan derlenir
+│   ├── 01_orchestrators/    # Orkestratörler
+│   ├── 02_specialists/      # Domain uzmanları
+│   ├── 03_quality_gates/    # Kalite kapıları
+│   ├── 04_meta/             # Meta skill'ler
+│   └── _TEMPLATE/           # Yeni skill şablonu
+├── .agents/skills/          # Antigravity / agent-runner formatı
+├── rules/                   # Cursor .mdc çıktısı (build sonrası oluşur)
+├── docs/
+│   ├── en/                  # İngilizce dokümantasyon
+│   └── tr/                  # Türkçe dokümantasyon
+└── setup.py                 # Build scripti
+```
+
+---
+
+## Skill Şablonu
+
+Yeni skill için `src/skills/_TEMPLATE/SKILL.md`'yi kopyala:
+
+```bash
+cp -r src/skills/_TEMPLATE src/skills/04_meta/yeni-skill
+# SKILL.md'yi düzenle
+python setup.py
+```
+
+---
+
+## Dokümantasyon
+
+| Döküman | İçerik |
+|---|---|
+| [Architecture](docs/en/core/ARCHITECTURE.md) | Sistem mimarisi |
+| [Hierarchy Protocol](docs/en/core/HIERARCHY_PROTOCOL.md) | Agent hiyerarşisi |
+| [Skills Catalog](docs/en/catalogs/SKILLS_CATALOG.md) | Tüm skill listesi |
+| [Installation](docs/en/core/INSTALLATION.md) | Kurulum detayları |
+| [Principles](docs/en/core/PRINCIPLES.md) | Mühendislik prensipleri |
+
+---
+
+## Fark: autonomous-agency vs claude-agency
+
+| | `autonomous-agency` | `claude-agency` |
+|---|---|---|
+| **Hedef** | Cursor, Windsurf, Cline, Aider | Yalnızca Claude Code |
+| **Build** | `setup.py` compile pipeline | Direkt, compile yok |
+| **Subagent** | Yok | 5 native agent |
+| **Hooks** | Yok | 4 tool-call hook |
+| **MCP** | Yok | 4 server |
+| **CLAUDE.md** | Yok | Var (4KB) |
